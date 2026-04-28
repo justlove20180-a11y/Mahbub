@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuad Mahbub Multi-Tool Hub</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root { 
+            --bg: #0f172a; 
+            --card: #1e293b; 
+            --primary: #6366f1;
+            --success: #10b981;
+            --resizer-bg: #f8fafc;
+        }
+
+        body { 
+            font-family: 'Inter', 'Segoe UI', sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            margin: 0; 
+            padding: 0;
+        }
+
+        /* Navigation Bar */
+        nav {
+            background: #1e293b;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            flex-wrap: wrap;
+        }
+
+        nav button {
+            background: transparent;
+            color: #cbd5e1;
+            border: 2px solid #475569;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        nav button.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .tool-section {
+            display: none;
+            padding: 40px 20px;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .tool-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* PDF Tool Styles */
+        .pdf-container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 450px;
+            margin: 0 auto;
+            color: #333;
+        }
+        .pdf-container input[type="file"] { margin: 20px 0; width: 100%; }
+        .btn-pdf { background-color: #007bff; color: white; border: none; padding: 14px; border-radius: 6px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; }
+
+        /* Collage Tool Styles */
+        .toolbar { background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 20px; display: inline-flex; gap: 15px; align-items: center; flex-wrap: wrap; justify-content: center; }
+        .gap-control { display: flex; align-items: center; gap: 8px; font-weight: bold; }
+        #collage-preview { display: grid; width: 90vw; max-width: 600px; margin: 0 auto; background: #fff; border: 2px solid #fff; overflow: hidden; gap: 5px; }
+        .style-grid { grid-template-columns: 1fr 1fr; grid-auto-rows: 300px; }
+        .style-mosaic { grid-template-columns: 1fr 1fr; grid-template-rows: 300px 300px; }
+        .style-mosaic .img-box:first-child { grid-row: span 2; }
+        .style-wide { grid-template-columns: 1fr; grid-auto-rows: 400px; }
+        .img-box { position: relative; width: 100%; height: 100%; overflow: hidden; cursor: move; background: #000; }
+        .img-box img { position: absolute; top: 0; left: 0; user-select: none; -webkit-user-drag: none; min-width: 100%; min-height: 100%; }
+        .btn-action { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-save { background: var(--success) !important; }
+
+        /* Resizer Tool Styles */
+        .resizer-wrapper { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; color: #1e293b; text-align: left; }
+        .upload-area { border: 2px dashed #cbd5e1; padding: 40px; border-radius: 12px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .upload-area:hover { border-color: #2563eb; background: #eff6ff; }
+        .main-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+        @media (max-width: 600px) { .main-layout { grid-template-columns: 1fr; } }
+        .settings { background: #f1f5f9; padding: 20px; border-radius: 12px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 14px; color: #1e293b; }
+        .input-group input[type="number"], .input-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .preview-box { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; min-height: 250px; }
+        #resizerPreviewImg { max-width: 100%; max-height: 300px; display: none; border-bottom: 1px solid #eee; }
+        .preview-info { padding: 10px; font-size: 13px; color: #64748b; }
+        .btn-resize-execute { background: #2563eb; color: white; border: none; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <button id="nav-pdf" class="active" onclick="showTool('pdf')">📄 Image to PDF</button>
+        <button id="nav-collage" onclick="showTool('collage')">🖼️ Collage Maker</button>
+        <button id="nav-resizer" onclick="showTool('resizer')">📏 Image Resizer</button>
+    </nav>
+
+    <div id="pdf-section" class="tool-section active">
+        <div class="pdf-container">
+            <h2 style="margin-top:0">🖼️ Image to PDF</h2>
+            <p>Apnar image select korun (A4 Size Output)</p>
+            <input type="file" id="imageInput" accept="image/*" multiple>
+            <button class="btn-pdf" onclick="generatePDF()">Convert to PDF</button>
+            <div id="status-pdf"></div>
+        </div>
+    </div>
+
+    <div id="collage-section" class="tool-section">
+        <h1 style="color: var(--primary);">Fuad Mahbub Image Collage Maker</h1>
+        <div class="toolbar">
+            <input type="file" id="imageUpload" multiple accept="image/*">
+            <div class="gap-control">
+                <span>Gap:</span>
+                <input type="range" id="gapRange" min="0" max="20" value="5" oninput="updateGap(this.value)">
+            </div>
+            <button class="btn-action" onclick="setStyle('style-grid')">Grid</button>
+            <button class="btn-action" onclick="setStyle('style-mosaic')">Mosaic</button>
+            <button class="btn-action" onclick="setStyle('style-wide')">Stack</button>
+            <button class="btn-action btn-save" onclick="downloadCollage()">Save Collage</button>
+        </div>
+        <div id="collage-preview" class="style-grid"></div>
+        <canvas id="exportCanvas" style="display:none;"></canvas>
+    </div>
+
+    <div id="resizer-section" class="tool-section">
+        <div class="resizer-wrapper">
+            <h1 style="color: #0f172a; text-align: center;">Fuad Mahbub Image Resizer</h1>
+            <div class="upload-area" onclick="document.getElementById('resizerFileInput').click()">
+                <p id="resizerUploadText">Click or Drag to Upload Image</p>
+                <input type="file" id="resizerFileInput" accept="image/*" hidden>
+            </div>
+            <div class="main-layout">
+                <div class="settings">
+                    <div class="input-group">
+                        <label>Target Size</label>
+                        <input type="number" id="targetSize" placeholder="Enter value (e.g. 500)">
+                    </div>
+                    <div class="input-group">
+                        <label>Unit</label>
+                        <select id="unit">
+                            <option value="kb">KB</option>
+                            <option value="mb">MB</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Max Width (Optional)</label>
+                        <input type="number" id="maxWidth" placeholder="Original Width">
+                    </div>
+                    <p style="font-size: 11px; color: #666;">Note: Size ta estimate kora hoy, content-er upor bhitti kore exact size ektu kom-beshi hote pare.</p>
+                </div>
+                <div class="preview-box">
+                    <img id="resizerPreviewImg" src="#" alt="Preview">
+                    <div class="preview-info" id="resizerStats">No image selected</div>
+                </div>
+            </div>
+            <button class="btn-resize-execute" id="resizerProcessBtn">Process & Download</button>
+        </div>
+    </div>
+
+    <script>
+        // Tab Switching Logic
+        function showTool(toolName) {
+            document.querySelectorAll('.tool-section').forEach(sec => sec.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(toolName + '-section').classList.add('active');
+            document.getElementById('nav-' + toolName).classList.add('active');
+        }
+
+        // --- PDF LOGIC ---
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const input = document.getElementById('imageInput');
+            const status = document.getElementById('status-pdf');
+            if (input.files.length === 0) return alert("Prothome image select korun!");
+            status.innerText = "Processing...";
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            const pdfWidth = doc.internal.pageSize.getWidth();
+            const pdfHeight = doc.internal.pageSize.getHeight();
+
+            for (let i = 0; i < input.files.length; i++) {
+                const imageData = await readFileAsDataURL(input.files[i]);
+                if (i > 0) doc.addPage('a4', 'p');
+                const imgProps = doc.getImageProperties(imageData);
+                const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+                const width = imgProps.width * ratio;
+                const height = imgProps.height * ratio;
+                doc.addImage(imageData, 'JPEG', (pdfWidth - width) / 2, (pdfHeight - height) / 2, width, height);
+            }
+            doc.save("converted-A4-images.pdf");
+            status.innerText = "Done!";
+        }
+
+        function readFileAsDataURL(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- COLLAGE LOGIC ---
+        const collageUpload = document.getElementById('imageUpload');
+        const collagePreview = document.getElementById('collage-preview');
+        function updateGap(val) { collagePreview.style.gap = val + "px"; }
+        function setStyle(className) { collagePreview.className = className; }
+
+        collageUpload.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            collagePreview.innerHTML = '';
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const box = document.createElement('div');
+                    box.className = 'img-box';
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => setupDraggable(img, box);
+                    box.appendChild(img);
+                    collagePreview.appendChild(box);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        function setupDraggable(img, box) {
+            let isDragging = false, startX, startY, initialLeft, initialTop;
+            const scale = Math.max(300 / img.naturalWidth, 300 / img.naturalHeight);
+            img.style.width = (img.naturalWidth * scale) + "px";
+            img.style.height = (img.naturalHeight * scale) + "px";
+            img.onmousedown = (e) => {
+                isDragging = true;
+                startX = e.clientX; startY = e.clientY;
+                initialLeft = img.offsetLeft; initialTop = img.offsetTop;
+            };
+            window.onmousemove = (e) => {
+                if (!isDragging) return;
+                img.style.left = (initialLeft + (e.clientX - startX)) + "px";
+                img.style.top = (initialTop + (e.clientY - startY)) + "px";
+            };
+            window.onmouseup = () => isDragging = false;
+        }
+
+        function downloadCollage() {
+            const boxes = collagePreview.querySelectorAll('.img-box');
+            if (!boxes.length) return alert("Upload images!");
+            const canvas = document.getElementById('exportCanvas');
+            const ctx = canvas.getContext('2d');
+            const containerRect = collagePreview.getBoundingClientRect();
+            const scaleFactor = 2000 / containerRect.width; 
+            canvas.width = containerRect.width * scaleFactor;
+            canvas.height = containerRect.height * scaleFactor;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            boxes.forEach(box => {
+                const img = box.querySelector('img');
+                const boxRect = box.getBoundingClientRect();
+                const x = (boxRect.left - containerRect.left) * scaleFactor;
+                const y = (boxRect.top - containerRect.top) * scaleFactor;
+                const w = boxRect.width * scaleFactor;
+                const h = boxRect.height * scaleFactor;
+                const imgLeft = parseFloat(img.style.left || 0) * scaleFactor;
+                const imgTop = parseFloat(img.style.top || 0) * scaleFactor;
+                const imgW = parseFloat(img.style.width) * scaleFactor;
+                const imgH = parseFloat(img.style.height) * scaleFactor;
+                ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+                ctx.drawImage(img, x + imgLeft, y + imgTop, imgW, imgH); ctx.restore();
+            });
+            const link = document.createElement('a');
+            link.download = 'collage-output.png';
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
+        }
+
+        // --- RESIZER LOGIC ---
+        const resizerInput = document.getElementById('resizerFileInput');
+        const resizerPreview = document.getElementById('resizerPreviewImg');
+        const resizerStats = document.getElementById('resizerStats');
+        const resizerBtn = document.getElementById('resizerProcessBtn');
+        let resizerFile = null;
+
+        resizerInput.onchange = e => {
+            const file = e.target.files[0];
+            if (file) {
+                resizerFile = file;
+                document.getElementById('resizerUploadText').innerText = file.name;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    resizerPreview.src = ev.target.result;
+                    resizerPreview.style.display = 'block';
+                    resizerStats.innerText = `Original Size: ${(file.size / 1024).toFixed(2)} KB`;
+                }
+                reader.readAsDataURL(file);
+            }
+        };
+
+        resizerBtn.onclick = async () => {
+            if (!resizerFile) return alert("Please upload an image!");
+            const targetSize = parseFloat(document.getElementById('targetSize').value);
+            const unit = document.getElementById('unit').value;
+            if (!targetSize) return alert("Enter target size!");
+            let targetBytes = unit === 'kb' ? targetSize * 1024 : targetSize * 1024 * 1024;
+            const img = new Image();
+            img.src = resizerPreview.src;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let ctx = canvas.getContext('2d');
+                let width = img.width, height = img.height;
+                const maxWidth = parseInt(document.getElementById('maxWidth').value);
+                if (maxWidth && width > maxWidth) {
+                    const ratio = maxWidth / width;
+                    width = maxWidth; height = img.height * ratio;
+                }
+                canvas.width = width; canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+                let quality = 0.9, dataUrl = "", low = 0, high = 1;
+                for (let i = 0; i < 6; i++) {
+                    quality = (low + high) / 2;
+                    dataUrl = canvas.toDataURL("image/jpeg", quality);
+                    const size = Math.round((dataUrl.split(',')[1].length) * 0.75);
+                    if (size > targetBytes) high = quality; else low = quality;
+                }
+                resizerPreview.src = dataUrl;
+                const finalSize = Math.round((dataUrl.split(',')[1].length) * 0.75);
+                resizerStats.innerText = `New Size: ${(finalSize / 1024).toFixed(2)} KB`;
+                const link = document.createElement('a');
+                link.download = `resized_fuad_${resizerFile.name.split('.')[0]}.jpg`;
+                link.href = dataUrl; link.click();
+            };
+        };
+    </script>
+</body>
+</html>
